@@ -110,6 +110,12 @@ O app utiliza o valor de `metering` retornado pelo `expo-audio`, aplicando:
 
 ---
 
+# 📸 Screenshots
+
+<p align="center">
+  <img src="./assets/decibelimetro-expo.jpeg" width="250" height="500" />
+</p>
+
 # 📄 Licença
 
 Este projeto está sob a licença MIT.
