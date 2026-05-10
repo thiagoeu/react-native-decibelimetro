@@ -54,7 +54,7 @@ src/
 ## 1. Clonar o repositório
 
 ```bash
-git clone <url-do-repositorio>
+git clone <https://github.com/thiagoeu/react-native-decibelimetro.git>
 ```
 
 ---
@@ -63,12 +63,6 @@ git clone <url-do-repositorio>
 
 ```bash
 npm install
-```
-
-ou
-
-```bash
-yarn
 ```
 
 ---
@@ -113,25 +107,6 @@ O app utiliza o valor de `metering` retornado pelo `expo-audio`, aplicando:
 - Suavização de leitura
 - Filtro de ruído mínimo
 - Atualização periódica
-
----
-
-# 📌 Próximas melhorias
-
-- 📉 Gráfico em tempo real
-- 🎚️ Calibração manual
-- 💾 Histórico de medições
-- 📤 Exportação de dados
-- 🔔 Alertas de ruído excessivo
-- 🌙 Tema escuro/claro
-- 📊 Estatísticas avançadas
-- 🎛️ Velocímetro circular
-
----
-
-# 👨‍💻 Autor
-
-Desenvolvido por Thiago Araujo.
 
 ---
 
