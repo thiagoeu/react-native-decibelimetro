@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { View, Text, StyleSheet } from "react-native";
+import Constants from "expo-constants";
 import { useDecibelMeter } from "./src/hooks/useDecibelMeter";
 import MeterDisplay from "./src/components/MeterDisplay";
 import NoiseStatus from "./src/components/NoiseStatus";
@@ -8,14 +9,23 @@ import ControlButton from "./src/components/ControlButton";
 import StatsPanel from "./src/components/StatsPanel";
 import { getColor, getNoiseLabel, getWidth } from "./src/shared/soundUtils";
 
+// Gera um ID único baseado no dispositivo (ou um fallback)
+const getDeviceSensorId = () => {
+  try {
+    // Tenta obter o deviceId (Android/iOS)
+    return (
+      Constants.deviceId || Constants.installationId || "soundtracker-mobile"
+    );
+  } catch {
+    return "soundtracker-mobile-default";
+  }
+};
+
 export default function App() {
+  const sensorId = "123";
+
   const { db, minDb, maxDb, avgDb, isRecording, start, stop } =
-    useDecibelMeter();
-
-  useEffect(() => {
-    start();
-  }, []);
-
+    useDecibelMeter(sensorId);
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Decibelímetro</Text>

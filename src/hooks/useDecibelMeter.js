@@ -1,93 +1,53 @@
 import { useEffect, useRef, useState } from "react";
+import { Audio } from "expo-av";
+import { enviarMedicao } from "../services/api";
 
-import { AudioModule, RecordingPresets, useAudioRecorder } from "expo-audio";
-
-export function useDecibelMeter() {
+export function useDecibelMeter(sensorId = "soundtracker-mobile-001") {
   const [db, setDb] = useState(0);
-
   const [isRecording, setIsRecording] = useState(false);
   const [minDb, setMinDb] = useState(null);
   const [maxDb, setMaxDb] = useState(null);
   const [avgDb, setAvgDb] = useState(null);
+
+  const recordingRef = useRef(null);
   const intervalRef = useRef(null);
+  const sendIntervalRef = useRef(null);
   const totalRef = useRef(0);
   const countRef = useRef(0);
+  const dbRef = useRef(0);
+  const isRecordingRef = useRef(false);
 
-  const recorder = useAudioRecorder({
-    ...RecordingPresets.HIGH_QUALITY,
-    isMeteringEnabled: true,
-  });
+  useEffect(() => {
+    dbRef.current = db;
+  }, [db]);
 
-  const start = async () => {
-    try {
-      // Evita múltiplas gravações
-      if (isRecording) return;
-
-      const permission = await AudioModule.requestRecordingPermissionsAsync();
-
-      if (!permission.granted) {
-        console.log("Permissão negada");
-        return;
-      }
-
-      await recorder.prepareToRecordAsync();
-
-      recorder.record();
-
-      setIsRecording(true);
-
-      startMetering();
-    } catch (error) {
-      console.log("START ERROR", error);
-    }
-  };
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
 
   const startMetering = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    console.log("📊 Iniciando intervalo de leitura do metering...");
     intervalRef.current = setInterval(async () => {
+      if (!recordingRef.current || !isRecordingRef.current) return;
       try {
-        const status = await recorder.getStatus();
-
-        if (status.metering !== undefined) {
-          // Conversão aproximada dBFS -> dB SPL
+        const status = await recordingRef.current.getStatusAsync();
+        if (status.isRecording && status.metering !== undefined) {
           const dbSPL = Math.max(35, Math.min(100, 90 + status.metering));
-          // Suavização
           setDb((prev) => {
             const smoothValue = prev * 0.7 + dbSPL * 0.3;
-
-            // mínimo noise floor filtering
             setMinDb((prevMin) => {
-              // ignora leituras absurdas
-              if (smoothValue < 32) {
-                return prevMin;
-              }
-
-              if (prevMin === null) {
-                return smoothValue;
-              }
-
+              if (smoothValue < 32) return prevMin;
+              if (prevMin === null) return smoothValue;
               return Math.min(prevMin, smoothValue);
             });
-
-            // máximo
             setMaxDb((prevMax) => {
-              if (prevMax === null) {
-                return smoothValue;
-              }
-
+              if (prevMax === null) return smoothValue;
               return Math.max(prevMax, smoothValue);
             });
-
-            // média
             totalRef.current += smoothValue;
-
             countRef.current += 1;
-
             setAvgDb(totalRef.current / countRef.current);
-
             return smoothValue;
           });
         }
@@ -97,16 +57,54 @@ export function useDecibelMeter() {
     }, 150);
   };
 
-  const stop = async () => {
-    try {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+  const startSending = () => {
+    if (sendIntervalRef.current) clearInterval(sendIntervalRef.current);
+    sendIntervalRef.current = setInterval(async () => {
+      if (isRecordingRef.current && dbRef.current > 0) {
+        await enviarMedicao(sensorId, dbRef.current);
       }
+    }, 2000);
+  };
 
-      await recorder.stop();
+  const start = async () => {
+    if (isRecording) return;
+    console.log("🔴 Solicitando permissão de áudio...");
+    try {
+      const { granted } = await Audio.requestPermissionsAsync();
+      if (!granted) {
+        console.log("❌ Permissão negada");
+        return;
+      }
+      console.log("✅ Permissão concedida");
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      console.log("🎤 Iniciando gravação...");
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        undefined,
+        true,
+      );
+      recordingRef.current = recording;
+      setIsRecording(true);
+      startMetering();
+      startSending();
+      console.log("📡 Gravação ativa, enviando medições...");
+    } catch (error) {
+      console.log("START ERROR", error);
+    }
+  };
 
+  const stop = async () => {
+    if (!recordingRef.current) return;
+    console.log("🛑 Parando gravação...");
+    try {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (sendIntervalRef.current) clearInterval(sendIntervalRef.current);
+      await recordingRef.current.stopAndUnloadAsync();
+      recordingRef.current = null;
       setIsRecording(false);
-
       setDb(0);
       setMinDb(null);
       setMaxDb(null);
@@ -120,17 +118,13 @@ export function useDecibelMeter() {
 
   useEffect(() => {
     return () => {
-      stop();
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (sendIntervalRef.current) clearInterval(sendIntervalRef.current);
+      if (recordingRef.current) {
+        recordingRef.current.stopAndUnloadAsync().catch(console.log);
+      }
     };
   }, []);
 
-  return {
-    db,
-    isRecording,
-    minDb,
-    maxDb,
-    avgDb,
-    start,
-    stop,
-  };
+  return { db, isRecording, minDb, maxDb, avgDb, start, stop };
 }
